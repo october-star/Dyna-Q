@@ -111,4 +111,4 @@ class MazeEnv:
         # Open a new path on the right
         self.obstacles.remove((0, 7))
 
-        print(">>> Blocking Maze changed at timestep 1000") 
+        print(">>> Blocking Maze changed at timestep 1000")

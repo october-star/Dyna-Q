@@ -9,7 +9,10 @@ import numpy as np
 from env.maze_env import MazeEnv
 from agents.q_learning import QLearningAgent
 from agents.dyna_q import DynaQAgent
+from agents.dyna_q_plus import DynaQPlusAgent
 from experiments.config import TRAINING_CONFIGS, AGENT_CONFIGS
+import matplotlib.pyplot as plt
+from utils.result_save_util import create_experiment_dir
 
 
 def run_static_maze_experiment(env, agent_type='q_learning',
@@ -137,6 +140,7 @@ def test_and_visualize(agent, env, num_episodes=5):
     print(f"  Average steps: {np.mean(test_steps):.1f}")
 
     return test_successes, test_steps
+
 
 
 if __name__ == "__main__":

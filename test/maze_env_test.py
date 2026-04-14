@@ -1,8 +1,11 @@
-from env.maze_env import MazeEnv
-
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+from env.maze_env import MazeEnv
+
+
 
 def test_basic_movement():
     print("=== Test 1: Basic Movement ===")

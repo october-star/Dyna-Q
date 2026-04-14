@@ -1,0 +1,5 @@
+{
+    "runs": 30,
+    "max_steps": 3000,
+    "change_step": 1000
+}

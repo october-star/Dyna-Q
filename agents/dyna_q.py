@@ -12,12 +12,15 @@ class DynaQAgent(QLearningAgent):
         self.planning_steps = planning_steps  # n: number of planning steps
 
         # Environment model: stores observed transitions
-        # Format: model[(state, action)] = (next_state, reward)
+        # Format: model[(state, action)] = (next_state, reward, done)
         self.model = {}
 
         # Track all visited (state, action) pairs for random sampling during planning
-        # This ensures all past experiences have a chance to be replayed
+        # Book pseudocode samples a previously observed state uniformly, then
+        # samples one of the actions previously taken in that state.
         self.visited_pairs = []
+        self.visited_states = []
+        self.state_actions = {}
 
     def choose_action(self, state, training=True):
         if training and np.random.random() < self.epsilon:
@@ -40,12 +43,21 @@ class DynaQAgent(QLearningAgent):
 
         # Store the observed transition in the environment model
         # This builds a deterministic model of the environment
-        self.model[(state, action)] = (next_state, reward)
+        self.model[(state, action)] = (next_state, reward, done)
 
         # Record this (state, action) pair for future planning
         # Only store unique pairs to avoid duplicates in sampling
         if (state, action) not in self.visited_pairs:
             self.visited_pairs.append((state, action))
+
+        if state not in self.visited_states:
+            self.visited_states.append(state)
+
+        if state not in self.state_actions:
+            self.state_actions[state] = []
+
+        if action not in self.state_actions[state]:
+            self.state_actions[state].append(action)
 
         # Perform n planning steps using the learned model
         # Each step randomly replays a past experience and updates Q-value
@@ -54,17 +66,16 @@ class DynaQAgent(QLearningAgent):
             if not self.visited_pairs:
                 break
 
-            # Randomly select a past (state, action) pair
-            # Uniform sampling ensures all experiences are revisited equally
-            s, a = random.choice(self.visited_pairs)
+            # Sample a previously observed state uniformly, then sample one of
+            # the actions previously taken in that state.
+            s = random.choice(self.visited_states)
+            a = random.choice(self.state_actions[s])
 
             # Retrieve the imagined outcome from the model
-            s_next, r = self.model[(s, a)]
+            s_next, r, model_done = self.model[(s, a)]
 
             # Update Q-value using the imagined experience
-            # Note: done=False because we don't know if s_next is terminal
-            # In practice, assuming non-terminal works well for planning
-            super().update(s, a, r, s_next, done=False)
+            super().update(s, a, r, s_next, done=model_done)
 
     def get_model_size(self):
         return len(self.model)
@@ -75,4 +86,5 @@ class DynaQAgent(QLearningAgent):
     def clear_model(self):
         self.model.clear()
         self.visited_pairs.clear()
-
+        self.visited_states.clear()
+        self.state_actions.clear()

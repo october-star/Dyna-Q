@@ -6,7 +6,7 @@ class QLearningAgent:
                  actions=4,  # Number of discrete actions (Up, Down, Left, Right)
                  alpha=0.1,  # Learning rate (0 < α ≤ 1)
                  gamma=0.95,  # Discount factor (0 ≤ γ ≤ 1)
-                 epsilon=0.1):  # Exploration rate (probability of random action)
+                 epsilon=0.2):  # Exploration rate (probability of random action)
 
         self.actions = actions
         self.alpha = alpha

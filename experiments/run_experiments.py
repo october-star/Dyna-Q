@@ -1,18 +1,20 @@
 import sys
 import os
+import random
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 from env.maze_env import MazeEnv
 from agents.dyna_q import DynaQAgent
 from agents.dyna_q_plus import DynaQPlusAgent
+from experiments.config import AGENT_CONFIGS
 import matplotlib.pyplot as plt
 from utils.result_save_util import create_experiment_dir, save_numpy, save_json, save_plot
 from experiments.run_dyna_maze import run_static_maze_experiment
 
 
 
-def experiment_dyna_maze(n_values=[0,5,10,50,100], runs=30, episodes=50):
+def experiment_dyna_maze(n_values=[0,5,10,50], runs=30, episodes=50):
     all_results = {n: np.zeros(episodes) for n in n_values}
 
     for n in n_values:
@@ -51,16 +53,36 @@ def plot_dyna_maze(results, save_path=None):
     plt.show()
 
 
-def experiment_blocking_maze(runs=30, max_steps=3000):
+def experiment_blocking_maze(runs=30, max_steps=3000, seed=0, kappa=None):
     dyna = np.zeros(max_steps)
     dyna_plus = np.zeros(max_steps)
+    dyna_config = AGENT_CONFIGS["dyna_q"]
+    dyna_plus_config = AGENT_CONFIGS["dyna_q_plus"]
+    dyna_plus_kappa = dyna_plus_config["kappa"] if kappa is None else kappa
 
     for run in range(runs):
+        run_seed = seed + run
+        np.random.seed(run_seed)
+        random.seed(run_seed)
+
         env1 = MazeEnv()
         env2 = MazeEnv()
 
-        agent1 = DynaQAgent(planning_steps=50)
-        agent2 = DynaQPlusAgent(planning_steps=50, kappa=0.001)
+        agent1 = DynaQAgent(
+            actions=4,
+            alpha=dyna_config["alpha"],
+            gamma=dyna_config["gamma"],
+            epsilon=dyna_config["epsilon"],
+            planning_steps=50,
+        )
+        agent2 = DynaQPlusAgent(
+            actions=4,
+            alpha=dyna_plus_config["alpha"],
+            gamma=dyna_plus_config["gamma"],
+            epsilon=dyna_plus_config["epsilon"],
+            planning_steps=50,
+            kappa=dyna_plus_kappa,
+        )
 
         s1 = env1.reset()
         s2 = env2.reset()

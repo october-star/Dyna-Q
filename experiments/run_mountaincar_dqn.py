@@ -1,3 +1,4 @@
+import argparse
 import os
 import random
 import sys
@@ -172,20 +173,73 @@ def run_dqn_mountaincar_experiment(
     }
 
 
+def parse_hidden_dims(raw_value):
+    return tuple(int(value) for value in raw_value.split(",") if value)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run a DQN baseline on MountainCar.")
+    parser.add_argument("--episodes", type=int, default=300, help="Number of training episodes.")
+    parser.add_argument("--max-steps", type=int, default=200, help="Max steps per episode.")
+    parser.add_argument("--runs", type=int, default=3, help="Number of random seeds / runs.")
+    parser.add_argument("--seed", type=int, default=0, help="Base random seed.")
+    parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor.")
+    parser.add_argument("--epsilon", type=float, default=1.0, help="Initial epsilon.")
+    parser.add_argument("--epsilon-min", type=float, default=0.05, help="Minimum epsilon.")
+    parser.add_argument("--epsilon-decay", type=float, default=0.995, help="Episode-wise epsilon decay.")
+    parser.add_argument("--learning-rate", type=float, default=1e-3, help="Q-network learning rate.")
+    parser.add_argument("--batch-size", type=int, default=64, help="Mini-batch size.")
+    parser.add_argument(
+        "--target-update-interval",
+        type=int,
+        default=200,
+        help="Number of optimizer steps between target-network syncs.",
+    )
+    parser.add_argument("--replay-capacity", type=int, default=50000, help="Replay buffer size.")
+    parser.add_argument(
+        "--hidden-dims",
+        type=str,
+        default="128,128",
+        help="Comma-separated hidden layer sizes for the Q-network.",
+    )
+    parser.add_argument(
+        "--reward-shaping-scale",
+        type=float,
+        default=0.1,
+        help="Velocity-based reward shaping coefficient used for training only.",
+    )
+    parser.add_argument(
+        "--warmup-steps",
+        type=int,
+        default=1000,
+        help="Number of random-action steps collected before training starts.",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    episodes = 300
-    max_steps = 200
-    runs = 3
-    seed = 0
-    hidden_dims = (128, 128)
-    reward_shaping_scale = 0.1
-    warmup_steps = 1000
+    args = parse_args()
+    episodes = args.episodes
+    max_steps = args.max_steps
+    runs = args.runs
+    seed = args.seed
+    hidden_dims = parse_hidden_dims(args.hidden_dims)
+    reward_shaping_scale = args.reward_shaping_scale
+    warmup_steps = args.warmup_steps
 
     results = run_dqn_mountaincar_experiment(
         episodes=episodes,
         max_steps=max_steps,
         runs=runs,
         seed=seed,
+        gamma=args.gamma,
+        epsilon=args.epsilon,
+        epsilon_min=args.epsilon_min,
+        epsilon_decay=args.epsilon_decay,
+        learning_rate=args.learning_rate,
+        batch_size=args.batch_size,
+        target_update_interval=args.target_update_interval,
+        replay_capacity=args.replay_capacity,
         hidden_dims=hidden_dims,
         reward_shaping_scale=reward_shaping_scale,
         warmup_steps=warmup_steps,
@@ -200,14 +254,14 @@ if __name__ == "__main__":
             "max_steps": max_steps,
             "runs": runs,
             "seed": seed,
-            "gamma": 0.99,
-            "epsilon": 1.0,
-            "epsilon_min": 0.05,
-            "epsilon_decay": 0.995,
-            "learning_rate": 1e-3,
-            "batch_size": 64,
-            "target_update_interval": 200,
-            "replay_capacity": 50000,
+            "gamma": args.gamma,
+            "epsilon": args.epsilon,
+            "epsilon_min": args.epsilon_min,
+            "epsilon_decay": args.epsilon_decay,
+            "learning_rate": args.learning_rate,
+            "batch_size": args.batch_size,
+            "target_update_interval": args.target_update_interval,
+            "replay_capacity": args.replay_capacity,
             "hidden_dims": list(hidden_dims),
             "env": "MountainCar-v0",
             "agent": "DQN baseline",

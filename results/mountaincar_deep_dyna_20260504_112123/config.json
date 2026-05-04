@@ -1,0 +1,37 @@
+{
+    "episodes": 30,
+    "max_steps": 200,
+    "runs": 1,
+    "seed": 0,
+    "gamma": 0.99,
+    "epsilon": 1.0,
+    "epsilon_min": 0.05,
+    "epsilon_decay": 0.995,
+    "learning_rate": 0.001,
+    "model_learning_rate": 0.001,
+    "batch_size": 64,
+    "planning_batch_size": 32,
+    "planning_steps": 2,
+    "planning_start_size": 1000,
+    "target_update_interval": 200,
+    "replay_capacity": 50000,
+    "hidden_dims": [
+        64,
+        64
+    ],
+    "model_hidden_dims": [
+        64,
+        64
+    ],
+    "env": "MountainCar-v0",
+    "agent": "Deep Dyna-Q",
+    "reward_shaping_scale": 0.1,
+    "warmup_steps": 200,
+    "model_train_steps": 1,
+    "eval_interval": 10,
+    "q_loss": "SmoothL1Loss",
+    "model_loss_fn": "SmoothL1Loss",
+    "double_dqn": true,
+    "world_model_target": "state_delta",
+    "state_normalization": "[-1, 1]"
+}

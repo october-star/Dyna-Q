@@ -1,0 +1,14 @@
+{
+    "bucket_configs": [
+        [
+            10,
+            10
+        ]
+    ],
+    "planning_steps": 5,
+    "episodes": 30,
+    "max_steps": 200,
+    "runs": 1,
+    "seed": 0,
+    "env": "MountainCar-v0"
+}

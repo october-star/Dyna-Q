@@ -1,3 +1,4 @@
+import argparse
 import os
 import random
 import sys
@@ -167,13 +168,43 @@ def run_bucket_sweep(
     return all_results
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run Tabular Dyna-Q on MountainCar.")
+    parser.add_argument("--episodes", type=int, default=300, help="Number of training episodes.")
+    parser.add_argument("--max-steps", type=int, default=200, help="Max steps per episode.")
+    parser.add_argument("--runs", type=int, default=3, help="Number of random seeds / runs.")
+    parser.add_argument("--seed", type=int, default=0, help="Base random seed.")
+    parser.add_argument(
+        "--planning-steps",
+        type=int,
+        default=10,
+        help="Planning updates per real environment step.",
+    )
+    parser.add_argument(
+        "--bucket-configs",
+        type=str,
+        default="5x5,10x10,20x20",
+        help="Comma-separated bucket configs such as '5x5,10x10,20x20'.",
+    )
+    return parser.parse_args()
+
+
+def parse_bucket_configs(raw_value):
+    configs = []
+    for item in raw_value.split(","):
+        left, right = item.lower().split("x")
+        configs.append((int(left), int(right)))
+    return tuple(configs)
+
+
 if __name__ == "__main__":
-    bucket_configs = ((5, 5), (10, 10), (20, 20))
-    planning_steps = 10
-    episodes = 300
-    max_steps = 200
-    runs = 3
-    seed = 0
+    args = parse_args()
+    bucket_configs = parse_bucket_configs(args.bucket_configs)
+    planning_steps = args.planning_steps
+    episodes = args.episodes
+    max_steps = args.max_steps
+    runs = args.runs
+    seed = args.seed
 
     results = run_bucket_sweep(
         bucket_configs=bucket_configs,

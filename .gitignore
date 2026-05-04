@@ -6,3 +6,4 @@ results/blocking_maze_20260414_*
 results/dyna_maze_20260414_*
 results/q_vs_dyna_20260414_*
 .pytest_cache/
+results/mountaincar_comparison_20260504_11*

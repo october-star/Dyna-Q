@@ -1,0 +1,41 @@
+{
+    "episodes": 300,
+    "max_steps": 200,
+    "runs": 3,
+    "seed": 0,
+    "agents": {
+        "tabular_dyna_q": {
+            "bins": [
+                10,
+                10
+            ],
+            "planning_steps": 10
+        },
+        "dqn_baseline": {
+            "hidden_dims": [
+                64,
+                64
+            ],
+            "reward_shaping_scale": 0.1,
+            "warmup_steps": 500
+        },
+        "deep_dyna_q": {
+            "hidden_dims": [
+                64,
+                64
+            ],
+            "model_hidden_dims": [
+                64,
+                64
+            ],
+            "reward_shaping_scale": 0.1,
+            "warmup_steps": 500,
+            "planning_steps": 5,
+            "planning_batch_size": 64,
+            "planning_start_size": 500,
+            "model_train_steps": 2
+        }
+    },
+    "env": "MountainCar-v0",
+    "notes": "Training return curves include exploration; deterministic eval is only tracked in the standalone Deep Dyna-Q experiment."
+}

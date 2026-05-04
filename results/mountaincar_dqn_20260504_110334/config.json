@@ -1,0 +1,22 @@
+{
+    "episodes": 300,
+    "max_steps": 200,
+    "runs": 3,
+    "seed": 0,
+    "gamma": 0.99,
+    "epsilon": 1.0,
+    "epsilon_min": 0.05,
+    "epsilon_decay": 0.995,
+    "learning_rate": 0.001,
+    "batch_size": 64,
+    "target_update_interval": 200,
+    "replay_capacity": 50000,
+    "hidden_dims": [
+        128,
+        128
+    ],
+    "env": "MountainCar-v0",
+    "agent": "DQN baseline",
+    "reward_shaping_scale": 0.1,
+    "warmup_steps": 1000
+}

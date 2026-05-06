@@ -59,3 +59,37 @@ def plot_learning_curve(rewards, steps, successes,
         print(f"Figure saved to {save_path}")
 
     plt.show()
+
+def plot_metric(series_by_label, ylabel, title, save_path):
+    plt.figure(figsize=(10, 6))
+
+    for label, values in series_by_label.items():
+        plt.plot(values, label=label)
+
+    plt.xlabel("Episode")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
+def plot_with_rolling(series_by_label, window, ylabel, title, save_path):
+    plt.figure(figsize=(10, 6))
+
+    for label, values in series_by_label.items():
+        values = np.asarray(values)
+
+        if len(values) >= window:
+            kernel = np.ones(window) / window
+            values = np.convolve(values, kernel, mode="valid")
+
+        plt.plot(values, label=label)
+
+    plt.xlabel("Episode")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
+    plt.close()

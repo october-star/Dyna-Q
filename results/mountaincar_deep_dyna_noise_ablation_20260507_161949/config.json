@@ -1,0 +1,39 @@
+{
+    "episodes": 300,
+    "max_steps": 200,
+    "runs": 3,
+    "seed": 0,
+    "noise_stds": [
+        0.0,
+        0.1,
+        0.2,
+        0.3
+    ],
+    "gamma": 0.99,
+    "epsilon": 1.0,
+    "epsilon_min": 0.05,
+    "epsilon_decay": 0.995,
+    "learning_rate": 0.001,
+    "model_learning_rate": 0.001,
+    "batch_size": 64,
+    "planning_batch_size": 64,
+    "planning_steps": 1,
+    "planning_start_size": 500,
+    "target_update_interval": 200,
+    "replay_capacity": 50000,
+    "hidden_dims": [
+        64,
+        64
+    ],
+    "model_hidden_dims": [
+        64,
+        64
+    ],
+    "reward_shaping_scale": 0.1,
+    "warmup_steps": 500,
+    "model_train_steps": 2,
+    "eval_interval": 10,
+    "env": "MountainCar-v0",
+    "agent": "Deep Dyna-Q",
+    "ablation": "Gaussian noise added to simulated next states during planning only"
+}

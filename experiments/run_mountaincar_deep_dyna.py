@@ -138,6 +138,7 @@ def run_deep_dyna_mountaincar_experiment(
     warmup_steps=1000,
     model_train_steps=2,
     eval_interval=10,
+    planning_noise_std=0.0,
 ):
     episode_steps = np.zeros(episodes)
     episode_returns = np.zeros(episodes)
@@ -146,9 +147,10 @@ def run_deep_dyna_mountaincar_experiment(
     model_losses = np.zeros(episodes)
     planning_q_losses = np.zeros(episodes)
     episode_epsilons = np.zeros(episodes)
-    eval_returns = np.full(episodes, np.nan)
-    eval_steps = np.full(episodes, np.nan)
-    eval_success_rate = np.full(episodes, np.nan)
+    eval_returns_sum = np.zeros(episodes)
+    eval_steps_sum = np.zeros(episodes)
+    eval_success_rate_sum = np.zeros(episodes)
+    eval_counts = np.zeros(episodes)
 
     for run in range(runs):
         run_seed = seed + run
@@ -190,6 +192,7 @@ def run_deep_dyna_mountaincar_experiment(
             hidden_dims=hidden_dims,
             model_hidden_dims=model_hidden_dims,
             model_train_steps=model_train_steps,
+            planning_noise_std=planning_noise_std,
             state_low=MOUNTAIN_CAR_LOW,
             state_high=MOUNTAIN_CAR_HIGH,
             device=device,
@@ -244,14 +247,23 @@ def run_deep_dyna_mountaincar_experiment(
 
             if (episode + 1) % eval_interval == 0:
                 eval_metrics = evaluate_agent(agent, eval_env, max_steps=max_steps)
-                eval_returns[episode] += eval_metrics["return"]
-                eval_steps[episode] += eval_metrics["steps"]
-                eval_success_rate[episode] += eval_metrics["success"]
+                eval_returns_sum[episode] += eval_metrics["return"]
+                eval_steps_sum[episode] += eval_metrics["steps"]
+                eval_success_rate_sum[episode] += eval_metrics["success"]
+                eval_counts[episode] += 1.0
 
             agent.decay_epsilon()
 
         env.close()
         eval_env.close()
+
+    eval_returns = np.full(episodes, np.nan)
+    eval_steps = np.full(episodes, np.nan)
+    eval_success_rate = np.full(episodes, np.nan)
+    evaluated = eval_counts > 0
+    eval_returns[evaluated] = eval_returns_sum[evaluated] / eval_counts[evaluated]
+    eval_steps[evaluated] = eval_steps_sum[evaluated] / eval_counts[evaluated]
+    eval_success_rate[evaluated] = eval_success_rate_sum[evaluated] / eval_counts[evaluated]
 
     return {
         "steps": episode_steps / runs,
@@ -261,9 +273,9 @@ def run_deep_dyna_mountaincar_experiment(
         "model_loss": model_losses / runs,
         "planning_q_loss": planning_q_losses / runs,
         "epsilon": episode_epsilons / runs,
-        "eval_returns": eval_returns / runs,
-        "eval_steps": eval_steps / runs,
-        "eval_success_rate": eval_success_rate / runs,
+        "eval_returns": eval_returns,
+        "eval_steps": eval_steps,
+        "eval_success_rate": eval_success_rate,
     }
 
 
@@ -335,6 +347,12 @@ def parse_args():
         default=10,
         help="Run deterministic evaluation every N episodes.",
     )
+    parser.add_argument(
+        "--planning-noise-std",
+        type=float,
+        default=0.0,
+        help="Standard deviation of Gaussian noise added to simulated next states during planning.",
+    )
     return parser.parse_args()
 
 
@@ -353,6 +371,7 @@ if __name__ == "__main__":
     planning_start_size = args.planning_start_size
     model_train_steps = args.model_train_steps
     eval_interval = args.eval_interval
+    planning_noise_std = args.planning_noise_std
 
     results = run_deep_dyna_mountaincar_experiment(
         episodes=episodes,
@@ -377,6 +396,7 @@ if __name__ == "__main__":
         replay_capacity=args.replay_capacity,
         model_train_steps=model_train_steps,
         eval_interval=eval_interval,
+        planning_noise_std=planning_noise_std,
     )
 
     save_dir = create_experiment_dir(name="mountaincar_deep_dyna")
@@ -408,10 +428,11 @@ if __name__ == "__main__":
             "warmup_steps": warmup_steps,
             "model_train_steps": model_train_steps,
             "eval_interval": eval_interval,
-            "q_loss": "SmoothL1Loss",
-            "model_loss_fn": "SmoothL1Loss",
-            "double_dqn": True,
-            "world_model_target": "state_delta",
+            "planning_noise_std": planning_noise_std,
+            "q_loss": "MSELoss",
+            "model_loss_fn": "MSELoss",
+            "double_dqn": False,
+            "world_model_target": "next_state",
             "state_normalization": "[-1, 1]",
         },
     )
@@ -468,7 +489,7 @@ if __name__ == "__main__":
 
     plot_metric(
         {"Deep Dyna-Q": results["model_loss"]},
-        ylabel="Smooth L1 Loss",
+        ylabel="MSE Loss",
         title="MountainCar Deep Dyna-Q: Episodes vs World Model Loss",
         save_path=os.path.join(save_dir, "model_loss.png"),
     )

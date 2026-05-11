@@ -55,6 +55,8 @@ class DynaQPlusAgent(DynaQAgent):
             a = random.randrange(self.actions)
 
             s_next, model_reward, model_done = self.model[(s, a)]
+            # Exploration bonus is added to the model reward, 
+            # which encourages the agent to try actions that haven't been tried for a while.
             tau = self.global_timestep - self.last_tried[(s, a)]
             bonus_reward = model_reward + self.kappa * np.sqrt(tau)
 

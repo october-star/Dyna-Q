@@ -44,6 +44,7 @@ class DeepDynaQAgent(DQNAgent):
         model_learning_rate=1e-3,
         model_train_steps=2,
         grad_clip_norm=10.0,
+        planning_noise_std=0.0,
         state_low=None,
         state_high=None,
         device=None,
@@ -68,6 +69,7 @@ class DeepDynaQAgent(DQNAgent):
         self.planning_start_size = planning_start_size
         self.model_train_steps = model_train_steps
         self.grad_clip_norm = grad_clip_norm
+        self.planning_noise_std = planning_noise_std
         self.model_network = WorldModel(
             state_dim=state_dim,
             action_dim=action_dim,
@@ -76,8 +78,8 @@ class DeepDynaQAgent(DQNAgent):
         self.model_optimizer = torch.optim.Adam(
             self.model_network.parameters(), lr=model_learning_rate
         )
-        self.loss_fn = nn.SmoothL1Loss()
-        self.model_loss_fn = nn.SmoothL1Loss()
+        self.loss_fn = nn.MSELoss()
+        self.model_loss_fn = nn.MSELoss()
 
         self.state_low = None
         self.state_high = None
@@ -133,8 +135,7 @@ class DeepDynaQAgent(DQNAgent):
         action_indices = actions.unsqueeze(1)
         current_q = self.q_network(normalized_states).gather(1, action_indices)
         with torch.no_grad():
-            next_actions = self.q_network(normalized_next_states).argmax(dim=1, keepdim=True)
-            next_q = self.target_network(normalized_next_states).gather(1, next_actions)
+            next_q = self.target_network(normalized_next_states).max(dim=1, keepdim=True).values
             targets = rewards + self.gamma * next_q * (1.0 - dones)
 
         loss = self.loss_fn(current_q, targets)
@@ -155,10 +156,9 @@ class DeepDynaQAgent(DQNAgent):
 
     def _world_model_update(self):
         states, actions, _, next_states, _ = self._sample_batch(self.batch_size)
-        target_delta = next_states - states
+        # minimizing the Mean Squared Error (MSE) between the predicted and actual next states
         predicted_next_states = self._predict_next_states(states, actions)
-        predicted_delta = predicted_next_states - states
-        loss = self.model_loss_fn(predicted_delta, target_delta)
+        loss = self.model_loss_fn(predicted_next_states, next_states)
         self.model_optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model_network.parameters(), max_norm=self.grad_clip_norm)
@@ -170,6 +170,15 @@ class DeepDynaQAgent(DQNAgent):
         states, actions, _, _, _ = self._sample_batch(planning_batch_size)
         with torch.no_grad():
             predicted_next_states = self._predict_next_states(states, actions)
+            ## Add noise to the predicted next states 
+            if self.planning_noise_std > 0.0:
+                noise = torch.randn_like(predicted_next_states) * self.planning_noise_std
+                predicted_next_states = predicted_next_states + noise
+                if self.state_low is not None and self.state_high is not None:
+                    predicted_next_states = torch.max(
+                        torch.min(predicted_next_states, self.state_high),
+                        self.state_low,
+                    )
             predicted_rewards, predicted_dones = planning_reward_fn(predicted_next_states)
         return self._q_update_from_tensors(
             states,

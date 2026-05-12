@@ -42,14 +42,52 @@ def reset_env(env):
 
 def step_env(env, action):
     outcome = env.step(action)
+
     if len(outcome) == 5:
         next_state, reward, terminated, truncated, info = outcome
         done = terminated or truncated
         return next_state, reward, done, terminated, truncated, info
+
     next_state, reward, done, info = outcome
     terminated = bool(next_state[0] >= 0.5)
     truncated = done and not terminated
     return next_state, reward, done, terminated, truncated, info
+
+
+def evaluate_agent(agent, env, max_steps=200, eval_episodes=5):
+    total_steps = 0.0
+    total_return = 0.0
+    total_success = 0.0
+
+    for _ in range(eval_episodes):
+        state = reset_env(env)
+        episode_return = 0.0
+        steps_this_episode = max_steps
+        success = 0
+
+        for step in range(1, max_steps + 1):
+            # Greedy policy: no epsilon exploration
+            action = agent.choose_action(state, training=False)
+
+            next_state, reward, done, terminated, truncated, _ = step_env(env, action)
+
+            episode_return += reward
+            state = next_state
+
+            if done:
+                steps_this_episode = step
+                success = int(terminated)
+                break
+
+        total_steps += steps_this_episode
+        total_return += episode_return
+        total_success += success
+
+    return {
+        "eval_steps": total_steps / eval_episodes,
+        "eval_returns": total_return / eval_episodes,
+        "eval_success_rate": total_success / eval_episodes,
+    }
 
 
 def run_tabular_mountaincar_experiment(
@@ -64,10 +102,15 @@ def run_tabular_mountaincar_experiment(
     epsilon=0.2,
     epsilon_min=0.01,
     epsilon_decay=0.995,
+    eval_episodes=5,
 ):
     episode_steps = np.zeros(episodes)
     episode_returns = np.zeros(episodes)
     success_rate = np.zeros(episodes)
+
+    eval_steps = np.zeros(episodes)
+    eval_returns = np.zeros(episodes)
+    eval_success_rate = np.zeros(episodes)
 
     for run in range(runs):
         run_seed = seed + run
@@ -106,6 +149,8 @@ def run_tabular_mountaincar_experiment(
                 action = agent.choose_action(state, training=True)
                 next_state, reward, done, terminated, truncated, _ = step_env(env, action)
 
+                # Use terminated for learning terminal flag.
+                # truncated means time limit, not true terminal state.
                 agent.update(state, action, reward, next_state, terminated)
 
                 total_reward += reward
@@ -125,12 +170,26 @@ def run_tabular_mountaincar_experiment(
                 decay_rate=epsilon_decay,
             )
 
+            eval_metrics = evaluate_agent(
+                agent=agent,
+                env=env,
+                max_steps=max_steps,
+                eval_episodes=eval_episodes,
+            )
+
+            eval_steps[episode] += eval_metrics["eval_steps"]
+            eval_returns[episode] += eval_metrics["eval_returns"]
+            eval_success_rate[episode] += eval_metrics["eval_success_rate"]
+
         env.close()
 
     return {
         "steps": episode_steps / runs,
         "returns": episode_returns / runs,
         "success_rate": success_rate / runs,
+        "eval_steps": eval_steps / runs,
+        "eval_returns": eval_returns / runs,
+        "eval_success_rate": eval_success_rate / runs,
     }
 
 
@@ -146,6 +205,7 @@ def run_bucket_sweep(
     epsilon=0.2,
     epsilon_min=0.01,
     epsilon_decay=0.995,
+    eval_episodes=5,
 ):
     all_results = {}
 
@@ -165,6 +225,7 @@ def run_bucket_sweep(
             epsilon=epsilon,
             epsilon_min=epsilon_min,
             epsilon_decay=epsilon_decay,
+            eval_episodes=eval_episodes,
         )
 
     return all_results
@@ -186,6 +247,7 @@ def parse_args():
     parser.add_argument("--epsilon", type=float, default=0.2)
     parser.add_argument("--epsilon-min", type=float, default=0.01)
     parser.add_argument("--epsilon-decay", type=float, default=0.995)
+    parser.add_argument("--eval-episodes", type=int, default=5)
 
     parser.add_argument(
         "--bucket-configs",
@@ -224,6 +286,7 @@ if __name__ == "__main__":
         epsilon=args.epsilon,
         epsilon_min=args.epsilon_min,
         epsilon_decay=args.epsilon_decay,
+        eval_episodes=args.eval_episodes,
     )
 
     save_dir = create_experiment_dir(name="mountaincar_tabular_dyna_bucket_sweep")
@@ -245,7 +308,8 @@ if __name__ == "__main__":
             "epsilon": args.epsilon,
             "epsilon_min": args.epsilon_min,
             "epsilon_decay": args.epsilon_decay,
-            "note": "Steps-to-goal is capped at max_steps for episodes that do not reach the goal.",
+            "eval_episodes": args.eval_episodes,
+            "note": "Training uses epsilon-greedy exploration. Evaluation uses greedy actions with training=False. Steps-to-goal is capped at max_steps for episodes that do not reach the goal.",
         },
     )
 
@@ -264,16 +328,29 @@ if __name__ == "__main__":
             f"success_rate_{label}": metrics["success_rate"]
             for label, metrics in results.items()
         },
+        **{
+            f"eval_steps_{label}": metrics["eval_steps"]
+            for label, metrics in results.items()
+        },
+        **{
+            f"eval_returns_{label}": metrics["eval_returns"]
+            for label, metrics in results.items()
+        },
+        **{
+            f"eval_success_rate_{label}": metrics["eval_success_rate"]
+            for label, metrics in results.items()
+        },
     )
 
+    # Training curves
     plot_metric(
         {
             label: metrics["steps"]
             for label, metrics in results.items()
         },
-        ylabel=f"Steps to goal / capped at {args.max_steps}",
-        title="MountainCar Tabular Dyna-Q: Episodes vs Steps-to-goal",
-        save_path=os.path.join(save_dir, "steps_to_goal.png"),
+        ylabel=f"Training steps to goal / capped at {args.max_steps}",
+        title="MountainCar Tabular Dyna-Q: Training Episodes vs Steps-to-goal",
+        save_path=os.path.join(save_dir, "training_steps_to_goal.png"),
     )
 
     plot_with_rolling(
@@ -282,9 +359,9 @@ if __name__ == "__main__":
             for label, metrics in results.items()
         },
         window=5,
-        ylabel="Return rolling mean, window=5",
-        title="MountainCar Tabular Dyna-Q: Episodes vs Return",
-        save_path=os.path.join(save_dir, "returns_rolling_mean.png"),
+        ylabel="Training return rolling mean, window=5",
+        title="MountainCar Tabular Dyna-Q: Training Episodes vs Return",
+        save_path=os.path.join(save_dir, "training_returns_rolling_mean.png"),
     )
 
     plot_metric(
@@ -292,9 +369,41 @@ if __name__ == "__main__":
             label: metrics["success_rate"]
             for label, metrics in results.items()
         },
-        ylabel="Success rate",
-        title="MountainCar Tabular Dyna-Q: Episodes vs Success Rate",
-        save_path=os.path.join(save_dir, "success_rate.png"),
+        ylabel="Training success rate",
+        title="MountainCar Tabular Dyna-Q: Training Episodes vs Success Rate",
+        save_path=os.path.join(save_dir, "training_success_rate.png"),
+    )
+
+    # Greedy evaluation curves
+    plot_metric(
+        {
+            label: metrics["eval_steps"]
+            for label, metrics in results.items()
+        },
+        ylabel=f"Evaluation steps to goal / capped at {args.max_steps}",
+        title="MountainCar Tabular Dyna-Q: Greedy Evaluation Steps-to-goal",
+        save_path=os.path.join(save_dir, "eval_steps_to_goal.png"),
+    )
+
+    plot_with_rolling(
+        {
+            label: metrics["eval_returns"]
+            for label, metrics in results.items()
+        },
+        window=5,
+        ylabel="Evaluation return rolling mean, window=5",
+        title="MountainCar Tabular Dyna-Q: Greedy Evaluation Return",
+        save_path=os.path.join(save_dir, "eval_returns_rolling_mean.png"),
+    )
+
+    plot_metric(
+        {
+            label: metrics["eval_success_rate"]
+            for label, metrics in results.items()
+        },
+        ylabel="Evaluation success rate",
+        title="MountainCar Tabular Dyna-Q: Greedy Evaluation Success Rate",
+        save_path=os.path.join(save_dir, "eval_success_rate.png"),
     )
 
     print(f"Results saved to: {save_dir}")

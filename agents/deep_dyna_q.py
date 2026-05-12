@@ -94,6 +94,11 @@ class DeepDynaQAgent(DQNAgent):
             return states
         return 2.0 * (states - self.state_low) / self.state_scale - 1.0
 
+    def denormalize_state(self, states):
+        if self.state_low is None or self.state_high is None:
+            return states
+        return 0.5 * (states + 1.0) * self.state_scale + self.state_low
+
     def choose_action(self, state, training=True):
         if training and torch.rand(1).item() < self.epsilon:
             return int(torch.randint(low=0, high=self.action_dim, size=(1,)).item())
@@ -170,15 +175,19 @@ class DeepDynaQAgent(DQNAgent):
         states, actions, _, _, _ = self._sample_batch(planning_batch_size)
         with torch.no_grad():
             predicted_next_states = self._predict_next_states(states, actions)
-            ## Add noise to the predicted next states 
+
+            # Inject model-error noise only during planning. When state bounds are
+            # available, perturb in normalized state space so sigma is comparable
+            # across dimensions before mapping back to the raw environment scale.
             if self.planning_noise_std > 0.0:
-                noise = torch.randn_like(predicted_next_states) * self.planning_noise_std
-                predicted_next_states = predicted_next_states + noise
                 if self.state_low is not None and self.state_high is not None:
-                    predicted_next_states = torch.max(
-                        torch.min(predicted_next_states, self.state_high),
-                        self.state_low,
-                    )
+                    normalized_next_states = self.normalize_state(predicted_next_states)
+                    noise = torch.randn_like(normalized_next_states) * self.planning_noise_std
+                    normalized_next_states = torch.clamp(normalized_next_states + noise, -1.0, 1.0)
+                    predicted_next_states = self.denormalize_state(normalized_next_states)
+                else:
+                    noise = torch.randn_like(predicted_next_states) * self.planning_noise_std
+                    predicted_next_states = predicted_next_states + noise
             predicted_rewards, predicted_dones = planning_reward_fn(predicted_next_states)
         return self._q_update_from_tensors(
             states,

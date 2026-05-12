@@ -29,10 +29,48 @@ def rolling_mean(values, window=5):
     return np.convolve(values, kernel, mode="valid")
 
 
-def plot_metric(series_by_label, ylabel, title, save_path):
+def noise_key(noise_std):
+    return str(noise_std).replace(".", "_")
+
+
+def plot_metric(series_by_label, ylabel, title, save_path, window=None):
     plt.figure(figsize=(10, 6))
     for label, values in series_by_label.items():
-        plt.plot(values, label=label)
+        values = np.asarray(values, dtype=float)
+        if window is not None and len(values) >= window:
+            values = rolling_mean(values, window)
+            x = np.arange(window - 1, window - 1 + len(values))
+        else:
+            x = np.arange(len(values))
+        plt.plot(x, values, label=label)
+    plt.xlabel("Episodes")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
+    plt.close()
+
+
+def plot_metric_with_std(mean_series_by_label, std_series_by_label, ylabel, title, save_path, window=None):
+    plt.figure(figsize=(10, 6))
+    for label, mean_values in mean_series_by_label.items():
+        mean_values = np.asarray(mean_values, dtype=float)
+        std_values = np.asarray(std_series_by_label[label], dtype=float)
+        if window is not None and len(mean_values) >= window:
+            mean_values = rolling_mean(mean_values, window)
+            std_values = rolling_mean(std_values, window)
+            x = np.arange(window - 1, window - 1 + len(mean_values))
+        else:
+            x = np.arange(len(mean_values))
+
+        plt.plot(x, mean_values, label=label)
+        plt.fill_between(
+            x,
+            mean_values - std_values,
+            mean_values + std_values,
+            alpha=0.2,
+        )
     plt.xlabel("Episodes")
     plt.ylabel(ylabel)
     plt.title(title)
@@ -151,6 +189,7 @@ if __name__ == "__main__":
             model_train_steps=args.model_train_steps,
             eval_interval=args.eval_interval,
             planning_noise_std=noise_std,
+            return_run_curves=True,
         )
 
     save_dir = create_experiment_dir(name="mountaincar_deep_dyna_noise_ablation")
@@ -184,6 +223,7 @@ if __name__ == "__main__":
             "env": "MountainCar-v0",
             "agent": "Deep Dyna-Q",
             "ablation": "Gaussian noise added to simulated next states during planning only",
+            "noise_space": "normalized state space when bounds are available",
         },
     )
 
@@ -191,36 +231,36 @@ if __name__ == "__main__":
         save_dir,
         "data.npz",
         **{
-            f"steps_sigma_{str(noise_std).replace('.', '_')}": metrics["steps"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"steps_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["steps"]
+            for noise_std in noise_stds
         },
         **{
-            f"returns_sigma_{str(noise_std).replace('.', '_')}": metrics["returns"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"returns_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["returns"]
+            for noise_std in noise_stds
         },
         **{
-            f"success_rate_sigma_{str(noise_std).replace('.', '_')}": metrics["success_rate"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"success_rate_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["success_rate"]
+            for noise_std in noise_stds
         },
         **{
-            f"eval_steps_sigma_{str(noise_std).replace('.', '_')}": metrics["eval_steps"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"eval_steps_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["eval_steps"]
+            for noise_std in noise_stds
         },
         **{
-            f"eval_returns_sigma_{str(noise_std).replace('.', '_')}": metrics["eval_returns"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"eval_returns_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["eval_returns"]
+            for noise_std in noise_stds
         },
         **{
-            f"eval_success_rate_sigma_{str(noise_std).replace('.', '_')}": metrics["eval_success_rate"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"eval_success_rate_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["eval_success_rate"]
+            for noise_std in noise_stds
         },
         **{
-            f"model_loss_sigma_{str(noise_std).replace('.', '_')}": metrics["model_loss"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"model_loss_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["model_loss"]
+            for noise_std in noise_stds
         },
         **{
-            f"planning_q_loss_sigma_{str(noise_std).replace('.', '_')}": metrics["planning_q_loss"]
-            for noise_std, metrics in zip(noise_stds, all_results.values())
+            f"planning_q_loss_sigma_{noise_key(noise_std)}": all_results[f"sigma={noise_std}"]["planning_q_loss"]
+            for noise_std in noise_stds
         },
     )
 
@@ -231,6 +271,31 @@ if __name__ == "__main__":
         save_path=os.path.join(save_dir, "steps_to_goal.png"),
     )
 
+    plot_metric_with_std(
+        {label: metrics["steps"] for label, metrics in all_results.items()},
+        {label: metrics["std"]["steps"] for label, metrics in all_results.items()},
+        ylabel="Steps to goal (mean ± std)",
+        title="Deep Dyna-Q Noise Ablation: Episodes vs Steps-to-goal",
+        save_path=os.path.join(save_dir, "steps_to_goal_mean_std.png"),
+    )
+
+    plot_metric(
+        {label: metrics["steps"] for label, metrics in all_results.items()},
+        ylabel="Steps to goal (rolling mean, window=5)",
+        title="Deep Dyna-Q Noise Ablation: Episodes vs Steps-to-goal",
+        save_path=os.path.join(save_dir, "steps_to_goal_rolling_mean.png"),
+        window=5,
+    )
+
+    plot_metric_with_std(
+        {label: metrics["steps"] for label, metrics in all_results.items()},
+        {label: metrics["std"]["steps"] for label, metrics in all_results.items()},
+        ylabel="Steps to goal (rolling mean, mean ± std)",
+        title="Deep Dyna-Q Noise Ablation: Episodes vs Steps-to-goal",
+        save_path=os.path.join(save_dir, "steps_to_goal_rolling_mean_std.png"),
+        window=5,
+    )
+
     plot_metric(
         {label: metrics["returns"] for label, metrics in all_results.items()},
         ylabel="Return",
@@ -239,10 +304,20 @@ if __name__ == "__main__":
     )
 
     plot_metric(
-        {label: rolling_mean(metrics["returns"], window=5) for label, metrics in all_results.items()},
+        {label: metrics["returns"] for label, metrics in all_results.items()},
         ylabel="Return (rolling mean, window=5)",
         title="Deep Dyna-Q Noise Ablation: Episodes vs Rolling Return",
         save_path=os.path.join(save_dir, "returns_rolling_mean.png"),
+        window=5,
+    )
+
+    plot_metric_with_std(
+        {label: metrics["returns"] for label, metrics in all_results.items()},
+        {label: metrics["std"]["returns"] for label, metrics in all_results.items()},
+        ylabel="Return (rolling mean, mean ± std)",
+        title="Deep Dyna-Q Noise Ablation: Episodes vs Rolling Return",
+        save_path=os.path.join(save_dir, "returns_rolling_mean_std.png"),
+        window=5,
     )
 
     plot_metric(

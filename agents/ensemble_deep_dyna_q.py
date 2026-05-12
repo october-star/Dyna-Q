@@ -37,12 +37,24 @@ class EnsembleDeepDynaQAgent(DeepDynaQAgent):
         """Returns ONLY the float loss to stay compatible with parent class[cite: 9]."""
         states, actions, _, _, _ = self._sample_batch(self.planning_batch_size)
         with torch.no_grad():
+            # Compute uncertainty from pairwise ensemble disagreement.
             u = self.ensemble.get_uncertainty(states, actions, self.normalize_state)
-            self.last_planning_disagreement = u.mean().item() # Store for the update() call
+            self.last_planning_disagreement = u.mean().item()
+
+            # Build state-action features for simulated model prediction.
             features = self._state_action_features(states, actions)
-            next_states = states + self.ensemble.models[0](features)
+
+            # Use the mean prediction of all ensemble models instead of relying on one model.
+            predicted_deltas = torch.stack([
+                model(features) for model in self.ensemble.models
+            ])
+
+            mean_delta = predicted_deltas.mean(dim=0)
+            next_states = states + mean_delta
+
+            # Penalize simulated planning rewards according to model uncertainty.
             r_base, dones = planning_reward_fn(next_states)
-            r_penalized = r_base - self.lambda_penalty * u # Uncertainty penalty[cite: 1]
+            r_penalized = r_base - self.lambda_penalty * u
         return self._q_update_from_tensors(states, actions, r_penalized, next_states, dones)
 
     def update(self, planning_reward_fn):
@@ -51,3 +63,11 @@ class EnsembleDeepDynaQAgent(DeepDynaQAgent):
         if isinstance(loss_info, dict):
             loss_info["avg_disagreement"] = self.last_planning_disagreement
         return loss_info
+
+
+
+
+#I just thought that since we already use all the ensemble models to measure uncertainty, 
+#it makes more sense to also use all of them when generating the planning prediction instead of relying on only the first model.
+# So I changed it to use the average prediction from the ensemble.
+

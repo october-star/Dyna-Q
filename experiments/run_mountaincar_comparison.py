@@ -13,6 +13,7 @@ from experiments.run_mountaincar_tabular_dyna import run_tabular_mountaincar_exp
 from experiments.run_mountaincar_dqn import run_dqn_mountaincar_experiment
 from experiments.run_mountaincar_deep_dyna import run_deep_dyna_mountaincar_experiment
 from utils.result_save_util import create_experiment_dir, save_json, save_numpy
+from experiments.run_mountaincar_ensemble import run_ensemble_experiment
 
 
 def rolling_mean(values, window=5):
@@ -92,11 +93,19 @@ def run_mountaincar_comparison(
         model_train_steps=deep_model_train_steps,
     )
 
+    print("Running Ensemble Deep Dyna-Q with uncertainty penalty")
+    ensemble_results = run_ensemble_experiment(
+        episodes=episodes,
+        runs=runs,
+    )
+
     return {
         "tabular_dyna_q": tabular_results,
         "dqn_baseline": dqn_results,
         "deep_dyna_q": deep_results,
+        "ensemble_deep_dyna_q": ensemble_results,
     }
+    
 
 
 def parse_hidden_dims(raw_value):
@@ -202,6 +211,11 @@ if __name__ == "__main__":
                     "planning_start_size": deep_planning_start_size,
                     "model_train_steps": deep_model_train_steps,
                 },
+                "ensemble_deep_dyna_q": {
+                    "K": 3,
+                    "lambda_penalty": 1.0,
+                    "notes": "Extension B uncertainty-aware Deep Dyna-Q agent.",
+                },
             },
             "env": "MountainCar-v0",
             "notes": "Training return curves include exploration; deterministic eval is only tracked in the standalone Deep Dyna-Q experiment.",
@@ -226,6 +240,8 @@ if __name__ == "__main__":
         deep_model_loss=results["deep_dyna_q"]["model_loss"],
         deep_planning_q_loss=results["deep_dyna_q"]["planning_q_loss"],
         deep_epsilon=results["deep_dyna_q"]["epsilon"],
+        ensemble_returns=results["ensemble_deep_dyna_q"]["returns"],
+        ensemble_disagreement=results["ensemble_deep_dyna_q"]["disagreement"],
     )
 
     plot_metric(
@@ -244,6 +260,7 @@ if __name__ == "__main__":
             "Tabular Dyna-Q": results["tabular_dyna_q"]["returns"],
             "DQN Baseline": results["dqn_baseline"]["returns"],
             "Deep Dyna-Q": results["deep_dyna_q"]["returns"],
+            "Ensemble Deep Dyna-Q": results["ensemble_deep_dyna_q"]["returns"],
         },
         ylabel="Return",
         title="MountainCar: Episodes vs Return",
@@ -255,6 +272,7 @@ if __name__ == "__main__":
             "Tabular Dyna-Q": rolling_mean(results["tabular_dyna_q"]["returns"], window=5),
             "DQN Baseline": rolling_mean(results["dqn_baseline"]["returns"], window=5),
             "Deep Dyna-Q": rolling_mean(results["deep_dyna_q"]["returns"], window=5),
+            "Ensemble Deep Dyna-Q": rolling_mean(results["ensemble_deep_dyna_q"]["returns"], window=5),
         },
         ylabel="Return (rolling mean, window=5)",
         title="MountainCar: Episodes vs Rolling Return",

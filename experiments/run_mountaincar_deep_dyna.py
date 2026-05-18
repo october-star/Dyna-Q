@@ -139,18 +139,18 @@ def run_deep_dyna_mountaincar_experiment(
     model_train_steps=2,
     eval_interval=10,
     planning_noise_std=0.0,
+    return_run_curves=False,
 ):
-    episode_steps = np.zeros(episodes)
-    episode_returns = np.zeros(episodes)
-    success_rate = np.zeros(episodes)
-    direct_q_losses = np.zeros(episodes)
-    model_losses = np.zeros(episodes)
-    planning_q_losses = np.zeros(episodes)
-    episode_epsilons = np.zeros(episodes)
-    eval_returns_sum = np.zeros(episodes)
-    eval_steps_sum = np.zeros(episodes)
-    eval_success_rate_sum = np.zeros(episodes)
-    eval_counts = np.zeros(episodes)
+    episode_steps = np.zeros((runs, episodes))
+    episode_returns = np.zeros((runs, episodes))
+    success_rate = np.zeros((runs, episodes))
+    direct_q_losses = np.zeros((runs, episodes))
+    model_losses = np.zeros((runs, episodes))
+    planning_q_losses = np.zeros((runs, episodes))
+    episode_epsilons = np.zeros((runs, episodes))
+    eval_returns = np.full((runs, episodes), np.nan)
+    eval_steps = np.full((runs, episodes), np.nan)
+    eval_success_rate = np.full((runs, episodes), np.nan)
 
     for run in range(runs):
         run_seed = seed + run
@@ -230,53 +230,72 @@ def run_deep_dyna_mountaincar_experiment(
 
                 if done:
                     success = int(terminated)
-                    episode_steps[episode] += step
+                    episode_steps[run, episode] = step
                     break
             else:
-                episode_steps[episode] += max_steps
+                episode_steps[run, episode] = max_steps
 
-            episode_returns[episode] += total_reward
-            success_rate[episode] += success
+            episode_returns[run, episode] = total_reward
+            success_rate[run, episode] = success
             if episode_direct_losses:
-                direct_q_losses[episode] += float(np.mean(episode_direct_losses))
+                direct_q_losses[run, episode] = float(np.mean(episode_direct_losses))
             if episode_model_losses:
-                model_losses[episode] += float(np.mean(episode_model_losses))
+                model_losses[run, episode] = float(np.mean(episode_model_losses))
             if episode_planning_losses:
-                planning_q_losses[episode] += float(np.mean(episode_planning_losses))
-            episode_epsilons[episode] += agent.epsilon
+                planning_q_losses[run, episode] = float(np.mean(episode_planning_losses))
+            episode_epsilons[run, episode] = agent.epsilon
 
             if (episode + 1) % eval_interval == 0:
                 eval_metrics = evaluate_agent(agent, eval_env, max_steps=max_steps)
-                eval_returns_sum[episode] += eval_metrics["return"]
-                eval_steps_sum[episode] += eval_metrics["steps"]
-                eval_success_rate_sum[episode] += eval_metrics["success"]
-                eval_counts[episode] += 1.0
+                eval_returns[run, episode] = eval_metrics["return"]
+                eval_steps[run, episode] = eval_metrics["steps"]
+                eval_success_rate[run, episode] = eval_metrics["success"]
 
             agent.decay_epsilon()
 
         env.close()
         eval_env.close()
 
-    eval_returns = np.full(episodes, np.nan)
-    eval_steps = np.full(episodes, np.nan)
-    eval_success_rate = np.full(episodes, np.nan)
-    evaluated = eval_counts > 0
-    eval_returns[evaluated] = eval_returns_sum[evaluated] / eval_counts[evaluated]
-    eval_steps[evaluated] = eval_steps_sum[evaluated] / eval_counts[evaluated]
-    eval_success_rate[evaluated] = eval_success_rate_sum[evaluated] / eval_counts[evaluated]
-
-    return {
-        "steps": episode_steps / runs,
-        "returns": episode_returns / runs,
-        "success_rate": success_rate / runs,
-        "direct_q_loss": direct_q_losses / runs,
-        "model_loss": model_losses / runs,
-        "planning_q_loss": planning_q_losses / runs,
-        "epsilon": episode_epsilons / runs,
-        "eval_returns": eval_returns,
-        "eval_steps": eval_steps,
-        "eval_success_rate": eval_success_rate,
+    results = {
+        "steps": np.mean(episode_steps, axis=0),
+        "returns": np.mean(episode_returns, axis=0),
+        "success_rate": np.mean(success_rate, axis=0),
+        "direct_q_loss": np.mean(direct_q_losses, axis=0),
+        "model_loss": np.mean(model_losses, axis=0),
+        "planning_q_loss": np.mean(planning_q_losses, axis=0),
+        "epsilon": np.mean(episode_epsilons, axis=0),
+        "eval_returns": np.nanmean(eval_returns, axis=0),
+        "eval_steps": np.nanmean(eval_steps, axis=0),
+        "eval_success_rate": np.nanmean(eval_success_rate, axis=0),
     }
+
+    if return_run_curves:
+        results["std"] = {
+            "steps": np.std(episode_steps, axis=0),
+            "returns": np.std(episode_returns, axis=0),
+            "success_rate": np.std(success_rate, axis=0),
+            "direct_q_loss": np.std(direct_q_losses, axis=0),
+            "model_loss": np.std(model_losses, axis=0),
+            "planning_q_loss": np.std(planning_q_losses, axis=0),
+            "epsilon": np.std(episode_epsilons, axis=0),
+            "eval_returns": np.nanstd(eval_returns, axis=0),
+            "eval_steps": np.nanstd(eval_steps, axis=0),
+            "eval_success_rate": np.nanstd(eval_success_rate, axis=0),
+        }
+        results["run_curves"] = {
+            "steps": episode_steps,
+            "returns": episode_returns,
+            "success_rate": success_rate,
+            "direct_q_loss": direct_q_losses,
+            "model_loss": model_losses,
+            "planning_q_loss": planning_q_losses,
+            "epsilon": episode_epsilons,
+            "eval_returns": eval_returns,
+            "eval_steps": eval_steps,
+            "eval_success_rate": eval_success_rate,
+        }
+
+    return results
 
 
 def parse_hidden_dims(raw_value):

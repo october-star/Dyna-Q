@@ -6,9 +6,6 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-import matplotlib.pyplot as plt
-import numpy as np
-
 from experiments.run_mountaincar_tabular_dyna import run_tabular_mountaincar_experiment
 from experiments.run_mountaincar_dqn import run_dqn_mountaincar_experiment
 from experiments.run_mountaincar_deep_dyna import run_deep_dyna_mountaincar_experiment
@@ -35,6 +32,7 @@ def plot_metric(series_by_label, ylabel, title, save_path):
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches="tight")
     plt.close()
+from utils.plotting import plot_metric, plot_with_rolling
 
 
 def run_mountaincar_comparison(
@@ -218,7 +216,7 @@ if __name__ == "__main__":
                 },
             },
             "env": "MountainCar-v0",
-            "notes": "Training return curves include exploration; deterministic eval is only tracked in the standalone Deep Dyna-Q experiment.",
+            "notes": "Training curves include exploration. Tabular Dyna-Q uses the 10x10 bucket setting selected from the discretization experiment.",
         },
     )
 
@@ -267,13 +265,17 @@ if __name__ == "__main__":
         save_path=os.path.join(save_dir, "returns_comparison.png"),
     )
 
-    plot_metric(
+    plot_with_rolling(
         {
             "Tabular Dyna-Q": rolling_mean(results["tabular_dyna_q"]["returns"], window=5),
             "DQN Baseline": rolling_mean(results["dqn_baseline"]["returns"], window=5),
             "Deep Dyna-Q": rolling_mean(results["deep_dyna_q"]["returns"], window=5),
             "Ensemble Deep Dyna-Q": rolling_mean(results["ensemble_deep_dyna_q"]["returns"], window=5),
+            "Tabular Dyna-Q": results["tabular_dyna_q"]["returns"],
+            "DQN Baseline": results["dqn_baseline"]["returns"],
+            "Deep Dyna-Q": results["deep_dyna_q"]["returns"],
         },
+        window=5,
         ylabel="Return (rolling mean, window=5)",
         title="MountainCar: Episodes vs Rolling Return",
         save_path=os.path.join(save_dir, "returns_rolling_mean_comparison.png"),

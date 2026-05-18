@@ -1,6 +1,6 @@
 # Extension B: Discrete Tabular Ensemble Framework
 
-This directory houses the complete, fully decoupled codebase for **Extension B (Discrete Tabular Ensemble Framework)**. This architecture isolates algorithmic model variance from neural network function approximations by operating within a purely discrete, tabular grid-world landscape (`MazeEnv`).
+This directory houses the complete codebase for **Extension B (Discrete Tabular Ensemble Framework)**. This architecture isolates algorithmic model variance from neural network function approximations by operating within a purely discrete, tabular grid-world landscape (`MazeEnv`).
 
 ## 1. Core Architecture
 
@@ -27,9 +27,9 @@ The execution script runs four distinct experimental evaluations sequentially:
 
 ---
 
-## 3. Repository File Blueprint
+## 3. Repository File Structure
 
-Your implementation uses these specific isolated files:
+
 ```text
 ├── agents/
 │   └── tabular_ensemble_dyna.py             # Core K-Model/K-Table ensemble agent logic
@@ -37,4 +37,6 @@ Your implementation uses these specific isolated files:
 │   └── maze_env.py                          # Stationary and non-stationary grid layout
 └── experiments/
     ├── run_tabular_ensemble_experiments.py  # Comprehensive multi-track ablation runner
-    └── README.md                            # This documentation asset
+
+## 3. RUN
+python experiments/run_tabular_ensemble_experiments.py
